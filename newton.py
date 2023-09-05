@@ -228,9 +228,12 @@ def newton_solve(iter_num, sigma, Uinit, Minit):
         horizontal2 = sparse.hstack([AMU, AMM])
         whole_A = sparse.vstack([horizontal1, horizontal2])
         # solve
+        B =
         sol = sparse.linalg.spsolve(whole_A, B)
 
         # update
+        U_new = sol + U
+        M_new = sol + M
         U = U_new
         M = M_new
 
@@ -238,7 +241,7 @@ def newton_solve(iter_num, sigma, Uinit, Minit):
     return U, M
 
 # INITIALIZATION
-Minit = np.zeros((Nt+1,Nx))
+Minit = np.zeros((Nx**2+))
 for n in range(Nt+1):
     Minit[n] = rho0
 Minit_tmp = Minit
