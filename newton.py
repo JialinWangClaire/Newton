@@ -83,12 +83,12 @@ def getuFinal_simple():
 
 # AUU
 def getAUU(sigma, Uk_n, Ukd1_n, Ukp1_n):
-   AUU = np.zeros((Nt**2, Nx**2))
+   AUU = np.zeros((Nt+1, Nx+1))
    # Thinking about terminal and boundary conditions
    p1 = npart((Ukp1_n - Uk_n) / Dx)
    p2 = ppart((Uk_n - Ukd1_n) / Dx)
-   for i in range(Nt**2):
-       for j in range(Nx**2):
+   for i in range(Nt+1):
+       for j in range(Nx+1):
            if i == j:
                if p1 < 0 and p2 < 0:
                    AUU[i][j] = 1 / Dt + (sigma ** 2)/(Dx ** 2) + (p1 + p2)(-2 / Dx)
@@ -114,7 +114,7 @@ def getAUU(sigma, Uk_n, Ukd1_n, Ukp1_n):
 
 # AMM
 def getAMM(sigma, Uk_n, Ukd1_n, Ukd2_n, Ukp1_n, Ukp2_n):
-    AMM = np.zeros((Nt ** 2, Nx ** 2))
+    AMM = np.zeros((Nt+1, Nx+1))
     # Thinking about terminal and boundary conditions
     p1 = npart((Ukp1_n - Uk_n) / Dx)
     p2 = ppart((Uk_n - Ukd1_n) / Dx)
@@ -122,8 +122,8 @@ def getAMM(sigma, Uk_n, Ukd1_n, Ukd2_n, Ukp1_n, Ukp2_n):
     p4 = ppart((Ukd1_n - Ukd2_n) / Dx)
     p5 = npart((Ukp2_n - Ukp1_n) / Dx)
     p6 = ppart((Ukp1_n - Uk_n) / Dx)
-    for i in range(Nt ** 2):
-        for j in range(Nx ** 2):
+    for i in range(Nt+1):
+        for j in range(Nx+1):
             if i == j:
                 AMM[i][j] = -1/Dt
             if i - j == Nx:
@@ -149,7 +149,7 @@ def getAMM(sigma, Uk_n, Ukd1_n, Ukd2_n, Ukp1_n, Ukp2_n):
 
 # AMU
 def getAMU(Uk_n, Ukd1_n, Ukd2_n, Ukp1_n, Ukp2_n, Mk_np1, Mkp1_np1, Mkd1_np1):
-    AMU = np.zeros((Nt ** 2, Nx ** 2))
+    AMU = np.zeros((Nt+1, Nx+1))
     # Thinking about terminal and boundary conditions
     p1 = npart((Ukp1_n - Uk_n) / Dx)
     p2 = ppart((Uk_n - Ukd1_n) / Dx)
@@ -157,8 +157,8 @@ def getAMU(Uk_n, Ukd1_n, Ukd2_n, Ukp1_n, Ukp2_n, Mk_np1, Mkp1_np1, Mkd1_np1):
     p4 = ppart((Ukd1_n - Ukd2_n) / Dx)
     p5 = npart((Ukp2_n - Ukp1_n) / Dx)
     p6 = ppart((Ukp1_n - Uk_n) / Dx)
-    for i in range(Nt ** 2):
-        for j in range(Nx ** 2):
+    for i in range(Nt+1):
+        for j in range(Nx+1):
             if i == j:
                 if p3 < 0 and p6 < 0:
                     AMU[i][j] = (-1 / Dx)(- Mkd1_np1 * (1 / Dx) + Mkp1_np1 * (1 / Dx))
@@ -197,13 +197,27 @@ def getAMU(Uk_n, Ukd1_n, Ukd2_n, Ukp1_n, Ukp2_n, Mk_np1, Mkp1_np1, Mkd1_np1):
 
 # AUM
 def getAUM():
-    AUM = np.zeros((Nt ** 2, Nx ** 2))
+    AUM = np.zeros((Nt+1, Nx+1))
     AUM_sparse = sparse.csr_matrix(AUM)
     return AUM_sparse
 
 # getFnU
 def getFnU_withoutM(sigma, Uk_n, Uk_np1, Ukp1_n, Ukd1_n):
-    FnU = np.zeros(Nx)
+    length = (Nt+1)(Nx+1)
+    FnU = np.zeros(length)
+    # boundary to be considered
+    # inside domain
+    for i in range(1, length):  # different on the boundary
+        Uk_n = Uk_n[i]
+        Uk_np1 = Uk_n[i+Nx]
+        Ukp1_n = Uk_n[i+1]
+        Ukd1_n = Uk_n[i-1]
+        FnU[i] += -(Uk_np1 - Uk_n) / Dt
+        FnU[i] += ((sigma ** 2) / 2.) * (2 * Uk_n - Ukp1_n - Ukd1_n) / (Dx ** 2)
+        FnU[i] += 1/2 * (npart((Ukp1_n - Uk_n)/Dx) + ppart((Uk_n - Ukd1_n)/Dx))**2
+    return FnU
+
+
 # getFnM
 def getFnM_withU(sigma, Mk_n, Mk_np1, Mkp1_np1, Mkd1_np1, Uk_n, Ukp1_n, Ukd1_n, Ukd2_n, Ukp2_n):
 
@@ -219,6 +233,14 @@ def newton_solve(iter_num, sigma, Uinit, Minit):
     U = Uinit
     M = Minit
     for i in range(iter_num):
+        Uk_n = U
+        Ukd1_n = U
+        Ukp1_n = U
+        Ukd2_n = U
+        Ukp2_n = U
+        Mk_np1 = M
+        Mkp1_np1 = M
+        Mkd1_np1 = M
         AUU = getAUU(sigma, Uk_n, Ukd1_n, Ukp1_n)
         AUM = getAUM()
         AMU = getAMU(Uk_n, Ukd1_n, Ukd2_n, Ukp1_n, Ukp2_n, Mk_np1, Mkp1_np1, Mkd1_np1)
@@ -228,26 +250,27 @@ def newton_solve(iter_num, sigma, Uinit, Minit):
         horizontal2 = sparse.hstack([AMU, AMM])
         whole_A = sparse.vstack([horizontal1, horizontal2])
         # solve
-        B =
+        B = U + M
         sol = sparse.linalg.spsolve(whole_A, B)
-
         # update
         U_new = sol + U
         M_new = sol + M
         U = U_new
         M = M_new
 
-
     return U, M
 
+
 # INITIALIZATION
-Minit = np.zeros((Nx**2+))
-for n in range(Nt+1):
-    Minit[n] = rho0
-Minit_tmp = Minit
-Uinit = np.zeros((Nt+1,Nx))
-for n in range(Nt+1):
+length = (Nt+1)(Nx+1)
+Uinit = np.zeros(length)
+for n in range(length):
     Uinit[n] = getuFinal_simple()
+
+Minit = np.zeros(length)
+for n in range(length):
+    Minit[n] = rho0
+
 
 print(newton_solve(1000, 0.1, Uinit, Minit))
 
